@@ -1,56 +1,49 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const boardContainer = document.getElementById('board');
-    const boardSizeSelect = document.getElementById('board-size');
-    const resetButton = document.getElementById('reset-button');
+    const containerTabuleiro = document.getElementById('tabuleiro');
+    const selectTamanhoTabuleiro = document.getElementById('tamanho-tabuleiro');
+    const selectModoJogo = document.getElementById('modo-jogo');
+    const botaoReiniciar = document.getElementById('botao-reiniciar');
+    const jogadorAtualDiv = document.getElementById('jogador-atual');
 
-    let boardSize = parseInt(boardSizeSelect.value, 10);
-    let currentPlayer = 'X';
-    let gameBoard = createEmptyBoard(boardSize);
-    let lastMove = { row: null, col: null, player: null };
+    let tamanhoTabuleiro = parseInt(selectTamanhoTabuleiro.value, 10);
+    let modoJogo = parseInt(selectModoJogo.value, 10);
+    let jogadorAtual = 'X';
+    let tabuleiroJogo = criarTabuleiroVazio(tamanhoTabuleiro);
+    let ultimaJogada = { linha: null, coluna: null, jogador: null };
 
-    function createEmptyBoard(size) {
-        return Array.from({ length: size }, () => Array(size).fill(''));
+    function criarTabuleiroVazio(tamanho) {
+        return Array.from({ length: tamanho }, () => Array(tamanho).fill(''));
     }
 
-    function checkWinner(row, col) {
-        // Verifica linhas e colunas
+    function verificarVencedor(linha, coluna) {
         if (
-            checkSequence(gameBoard[row]) ||
-            checkSequence(getColumn(col))
+            verificarSequencia(tabuleiroJogo[linha]) ||
+            verificarSequencia(obterColuna(coluna)) ||
+            verificarDiagonal() ||
+            verificarAntiDiagonal()
         ) {
-            return true;
-        }
-
-        // Verifica diagonais
-        if (checkDiagonal() || checkAntiDiagonal()) {
             return true;
         }
 
         return false;
     }
 
-    function checkDiagonal() {
-        const diagonal = [];
-        for (let i = 0; i < boardSize; i++) {
-            diagonal.push(gameBoard[i][i]);
-        }
-        return checkSequence(diagonal);
+    function verificarDiagonal() {
+        const diagonal = Array.from({ length: tamanhoTabuleiro }, (_, i) => tabuleiroJogo[i][i]);
+        return verificarSequencia(diagonal);
     }
 
-    function checkAntiDiagonal() {
-        const antiDiagonal = [];
-        for (let i = 0; i < boardSize; i++) {
-            antiDiagonal.push(gameBoard[i][boardSize - 1 - i]);
-        }
-        return checkSequence(antiDiagonal);
+    function verificarAntiDiagonal() {
+        const antiDiagonal = Array.from({ length: tamanhoTabuleiro }, (_, i) => tabuleiroJogo[i][tamanhoTabuleiro - 1 - i]);
+        return verificarSequencia(antiDiagonal);
     }
 
-    function checkSequence(array) {
+    function verificarSequencia(array) {
         let count = 0;
         for (let i = 0; i < array.length; i++) {
-            if (array[i] === currentPlayer) {
+            if (array[i] === jogadorAtual) {
                 count++;
-                if (count === boardSize) { // Alteração aqui para verificar se há sequência do tamanho da linha/coluna
+                if (count === tamanhoTabuleiro) {
                     return true;
                 }
             } else {
@@ -60,73 +53,131 @@ document.addEventListener('DOMContentLoaded', () => {
         return false;
     }
 
-    function getColumn(col) {
-        const column = [];
-        for (let i = 0; i < boardSize; i++) {
-            column.push(gameBoard[i][col]);
-        }
-        return column;
+    function obterColuna(coluna) {
+        return Array.from({ length: tamanhoTabuleiro }, (_, i) => tabuleiroJogo[i][coluna]);
     }
 
-    function handleCellClick(event) {
-        const row = parseInt(event.target.dataset.row, 10);
-        const col = parseInt(event.target.dataset.col, 10);
+    function lidarComCliqueCelula(evento) {
+        if (modoJogo === 1 && jogadorAtual === 'O') {
+            // Não permite que o segundo jogador (controlado pelo código) clique nas células
+            return;
+        }
 
-        if (gameBoard[row][col] === '') {
-            gameBoard[row][col] = currentPlayer;
-            lastMove = { row, col, player: currentPlayer };
-            renderBoard();
+        const linha = parseInt(evento.target.dataset.linha, 10);
+        const coluna = parseInt(evento.target.dataset.coluna, 10);
 
-            if (checkWinner(row, col)) {
+        if (tabuleiroJogo[linha][coluna] === '') {
+            tabuleiroJogo[linha][coluna] = jogadorAtual;
+            ultimaJogada = { linha, coluna, jogador: jogadorAtual };
+            renderizarTabuleiro();
+
+            if (verificarVencedor(linha, coluna)) {
                 setTimeout(() => {
-                    alert(`Temos um vencedor! Última jogada: ${lastMove.player} na posição (${lastMove.row}, ${lastMove.col})`);
-                    resetGame();
-                }, 100); // Adicionando um pequeno atraso para garantir que a última jogada seja renderizada antes do alerta
-            } else if (checkDraw()) {
+                    alert(`Temos um vencedor! Última jogada: ${ultimaJogada.jogador} na posição (${ultimaJogada.linha}, ${ultimaJogada.coluna})`);
+                    reiniciarJogo();
+                }, 100);
+            } else if (verificarEmpate()) {
                 alert("O jogo empatou!");
-                resetGame();
+                reiniciarJogo();
             } else {
-                currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+                jogadorAtual = jogadorAtual === 'X' ? 'O' : 'X';
+                atualizarJogadorAtual();
+
+                if (modoJogo === 1 && jogadorAtual === 'O') {
+                    // Se for 1 jogador, e agora é a vez do jogador O (controlado pelo código), faça uma jogada automática
+                    fazerJogadaAutomatica();
+                }
             }
         }
     }
 
-    function checkDraw() {
-        return gameBoard.flat().every(cell => cell !== '');
+    function verificarEmpate() {
+        return tabuleiroJogo.flat().every(celula => celula !== '');
     }
 
-    function renderBoard() {
-        boardContainer.innerHTML = '';
-        boardContainer.style.setProperty('--board-size', boardSize);
-        for (let row = 0; row < boardSize; row++) {
-            for (let col = 0; col < boardSize; col++) {
-                const cell = document.createElement('div');
-                cell.className = 'cell';
-                cell.dataset.row = row;
-                cell.dataset.col = col;
-                cell.textContent = gameBoard[row][col];
-                
-                // Destacar a última jogada na tabela
-                if (row === lastMove.row && col === lastMove.col) {
-                    cell.classList.add('last-move');
+    function renderizarTabuleiro() {
+        containerTabuleiro.innerHTML = '';
+
+        // Adicionando elemento para mostrar o jogador atual acima da tabela
+        jogadorAtualDiv.textContent = `Jogador Atual: ${jogadorAtual}`;
+
+        containerTabuleiro.style.setProperty('--tamanho-tabuleiro', tamanhoTabuleiro);
+
+        for (let linha = 0; linha < tamanhoTabuleiro; linha++) {
+            for (let coluna = 0; coluna < tamanhoTabuleiro; coluna++) {
+                const celula = document.createElement('div');
+                celula.className = 'celula';
+                celula.dataset.linha = linha;
+                celula.dataset.coluna = coluna;
+                celula.textContent = tabuleiroJogo[linha][coluna];
+
+                if (linha === ultimaJogada.linha && coluna === ultimaJogada.coluna) {
+                    celula.classList.add('ultima-jogada');
                 }
 
-                cell.addEventListener('click', handleCellClick);
-                boardContainer.appendChild(cell);
+                celula.addEventListener('click', lidarComCliqueCelula);
+                containerTabuleiro.appendChild(celula);
             }
         }
     }
 
-    function resetGame() {
-        boardSize = parseInt(boardSizeSelect.value, 10);
-        gameBoard = createEmptyBoard(boardSize);
-        currentPlayer = 'X';
-        lastMove = { row: null, col: null, player: null };
-        renderBoard();
+    function atualizarJogadorAtual() {
+        jogadorAtualDiv.textContent = `Jogador Atual: ${jogadorAtual}`;
     }
 
-    resetButton.addEventListener('click', resetGame);
-    boardSizeSelect.addEventListener('change', resetGame);
+    function fazerJogadaAutomatica() {
+        // Encontrar uma célula vazia aleatória para a jogada automática
+        const celulasVazias = [];
+        for (let linha = 0; linha < tamanhoTabuleiro; linha++) {
+            for (let coluna = 0; coluna < tamanhoTabuleiro; coluna++) {
+                if (tabuleiroJogo[linha][coluna] === '') {
+                    celulasVazias.push({ linha, coluna });
+                }
+            }
+        }
 
-    renderBoard();
+        // Escolher aleatoriamente uma célula vazia
+        const jogadaAutomatica = celulasVazias[Math.floor(Math.random() * celulasVazias.length)];
+
+        // Fazer a jogada automática após um pequeno atraso
+        setTimeout(() => {
+            tabuleiroJogo[jogadaAutomatica.linha][jogadaAutomatica.coluna] = jogadorAtual;
+            ultimaJogada = { linha: jogadaAutomatica.linha, coluna: jogadaAutomatica.coluna, jogador: jogadorAtual };
+            renderizarTabuleiro();
+
+            if (verificarVencedor(jogadaAutomatica.linha, jogadaAutomatica.coluna)) {
+                setTimeout(() => {
+                    alert(`Temos um vencedor! Última jogada: ${ultimaJogada.jogador} na posição (${ultimaJogada.linha}, ${ultimaJogada.coluna})`);
+                    reiniciarJogo();
+                }, 100);
+            } else if (verificarEmpate()) {
+                alert("O jogo empatou!");
+                reiniciarJogo();
+            } else {
+                jogadorAtual = jogadorAtual === 'X' ? 'O' : 'X';
+                atualizarJogadorAtual();
+            }
+        }, 500);
+    }
+
+    function reiniciarJogo() {
+        tamanhoTabuleiro = parseInt(selectTamanhoTabuleiro.value, 10);
+        modoJogo = parseInt(selectModoJogo.value, 10);
+        tabuleiroJogo = criarTabuleiroVazio(tamanhoTabuleiro);
+        jogadorAtual = 'X';
+        ultimaJogada = { linha: null, coluna: null, jogador: null };
+        renderizarTabuleiro();
+        atualizarJogadorAtual();
+
+        if (modoJogo === 1 && jogadorAtual === 'O') {
+            // Se for 1 jogador, e o jogador O (controlado pelo código), faça a primeira jogada automática
+            fazerJogadaAutomatica();
+        }
+    }
+
+    botaoReiniciar.addEventListener('click', reiniciarJogo);
+    selectTamanhoTabuleiro.addEventListener('change', reiniciarJogo);
+    selectModoJogo.addEventListener('change', reiniciarJogo);
+
+    renderizarTabuleiro();
 });
